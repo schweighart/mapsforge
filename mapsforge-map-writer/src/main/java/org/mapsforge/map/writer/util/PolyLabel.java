@@ -22,7 +22,6 @@ package org.mapsforge.map.writer.util;
 import org.locationtech.jts.geom.*;
 
 import java.util.Comparator;
-import java.util.Optional;
 import java.util.PriorityQueue;
 import java.util.logging.Logger;
 
