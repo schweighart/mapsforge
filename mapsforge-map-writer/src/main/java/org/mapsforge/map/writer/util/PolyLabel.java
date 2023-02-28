@@ -22,6 +22,7 @@ package org.mapsforge.map.writer.util;
 import org.locationtech.jts.geom.*;
 
 import java.util.Comparator;
+import java.util.Optional;
 import java.util.PriorityQueue;
 import java.util.logging.Logger;
 
@@ -34,10 +35,35 @@ public class PolyLabel {
     /**
      * Returns pole of inaccessibility, the most distant internal point from the polygon outline.
      *
-     * @param geometry geometry that can be correctly interpreted as a polygon
+     * @param geometry geometry with lat/lng coordinates that can be correctly interpreted as a polygon
      * @return optimal label placement point
      */
     public static Point get(Geometry geometry) {
+        return get(geometry, null, 512, false);
+    }
+
+    /**
+     * Returns pole of inaccessibility, the most distant internal point from the polygon outline.
+     *
+     * @param geometry geometry with pixel coordinates that can be correctly interpreted as a polygon
+     * @param zoom zoom that is used to define the precision
+     * @return optimal label placement point
+     */
+    public static Point getWithPixelGeometry(Geometry geometry, int zoom, int tileSize) {
+        return get(geometry, zoom, tileSize, true);
+    }
+
+    /**
+     * Returns pole of inaccessibility, the most distant internal point from the polygon outline.
+     *
+     * @param geometry geometry that can be correctly interpreted as a polygon
+     * @param zoom zoom that is used to define the precision (optional)
+     * @param tileSize tileSize that is used in case of zoom parameter is used
+     * @param geometryInPixel Flag if geometry is provided in pixel instead of lat/lng
+     * @return optimal label placement point
+     */
+    private static Point get(Geometry geometry, Integer zoom, int tileSize, final boolean geometryInPixel) {
+        double precision = zoom == null ? PRECISION : (1.0 / (tileSize << zoom)); // a logical pixel for given zoom
         // Get polygon from geometry
         Polygon polygon;
         if (geometry instanceof LineString) {
@@ -65,13 +91,15 @@ public class PolyLabel {
 
         // Re-project coordinates. This is needed to get proper visual results for polygons
         // distorted my Mercator projection
-        polygon.apply(new CoordinateFilter() {
-            @Override
-            public void filter(Coordinate c) {
-                c.x = longitudeToX(c.x);
-                c.y = latitudeToY(c.y);
-            }
-        });
+        if (!geometryInPixel) {
+            polygon.apply(new CoordinateFilter() {
+                @Override
+                public void filter(Coordinate c) {
+                    c.x = longitudeToX(c.x);
+                    c.y = latitudeToY(c.y);
+                }
+            });
+        }
         polygon.geometryChanged();
 
         Envelope envelope = polygon.getEnvelopeInternal();
@@ -107,7 +135,7 @@ public class PolyLabel {
                 bestCell = cell;
 
             // Do not drill down further if there's no chance of a better solution
-            if (cell.max - bestCell.d <= PRECISION) continue;
+            if (cell.max - bestCell.d <= precision) continue;
 
             // Split the cell into four cells
             h = cell.h / 2;
@@ -118,7 +146,7 @@ public class PolyLabel {
         }
 
         // Return the best found point projected back to geodesic coordinates
-        return geometry.getFactory().createPoint(new Coordinate(toLongitude(bestCell.x), toLatitude(bestCell.y)));
+        return geometry.getFactory().createPoint(new Coordinate(geometryInPixel ? bestCell.x : toLongitude(bestCell.x), geometryInPixel ? bestCell.y : toLatitude(bestCell.y)));
     }
 
     private static class MaxComparator implements Comparator<Cell> {
