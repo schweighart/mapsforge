@@ -107,6 +107,9 @@ public class PolyLabel {
         double height = envelope.getHeight();
         double cellSize = Math.min(width, height);
         double h = cellSize / 2;
+        if (geometryInPixel) {
+            precision=Math.max(0.1, Math.min(width/1000d, height/1000d));
+        }
 
         // A priority queue of cells in order of their "potential" (max distance to polygon)
         PriorityQueue<Cell> cellQueue = new PriorityQueue<>(1, new MaxComparator());
